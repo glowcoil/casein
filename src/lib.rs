@@ -38,6 +38,46 @@ impl Rect {
     }
 }
 
+pub struct Padding {
+    padding: f32,
+    rect: Rect,
+    inside_child: bool,
+    child: Box<dyn View>,
+}
+
+impl Padding {
+    pub fn new(padding: f32, child: Box<dyn View>) -> Padding {
+        Padding { padding, child, inside_child: false, rect: Rect::new(0.0, 0.0, 0.0, 0.0) }
+    }
+}
+
+impl View for Padding {
+    fn handle(&mut self, input: Input, state: &InputState) -> Response {
+        self.child.handle(input, state)
+    }
+
+    fn layout(&mut self, max_width: f32, max_height: f32) {
+        self.child.layout(max_width - 2.0 * self.padding, max_height - 2.0 * self.padding);
+        let rect = self.child.rect();
+        self.rect.width = rect.width + 2.0 * self.padding;
+        self.rect.height = rect.height + 2.0 * self.padding;
+    }
+
+    fn offset(&mut self, x: f32, y: f32) {
+        self.rect.x = x;
+        self.rect.y = y;
+        self.child.offset(self.padding + x, self.padding + y);
+    }
+
+    fn render(&mut self, frame: &mut Frame) {
+        self.child.render(frame);
+    }
+
+    fn rect(&self) -> Rect {
+        self.rect
+    }
+}
+
 pub struct BackgroundColor {
     color: Color,
     child: Box<dyn View>,
