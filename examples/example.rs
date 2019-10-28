@@ -1,4 +1,5 @@
-use gouache::{Color, Cache, Frame, renderers::GlRenderer};
+use gouache::{Color, Frame, Font, Cache, renderers::GlRenderer};
+use casein::{*, input::*};
 
 const FRAME: std::time::Duration = std::time::Duration::from_micros(1_000_000 / 60);
 
@@ -17,13 +18,23 @@ fn main() {
     let mut cache = Cache::new();
     let mut renderer = GlRenderer::new();
 
+    let mut font = Font::from_bytes(include_bytes!("../res/SourceSansPro-Regular.ttf")).unwrap();
+
+    let mut root = Text::new(font, 14.0, "jackdaws love my".to_string());
+
     let mut running = true;
     let mut now = std::time::Instant::now();
     while running {
         let size = context.window().get_inner_size().unwrap();
 
         let mut frame = Frame::new(&mut cache, &mut renderer, size.width as f32, size.height as f32);
+
         frame.clear(Color::rgba(0.1, 0.15, 0.2, 1.0));
+
+        root.layout(size.width as f32, size.height as f32);
+        root.offset(0.0, 0.0);
+        root.render(&mut frame);
+
         frame.finish();
 
         context.swap_buffers().unwrap();
