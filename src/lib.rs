@@ -211,3 +211,71 @@ impl View for Text {
         self.rect
     }
 }
+
+pub struct Button {
+    inside: bool,
+    down: bool,
+    contents: BackgroundColor,
+}
+
+impl Button {
+    pub fn new(child: Box<dyn View>) -> Button {
+        Button { inside: false, down: false, contents: BackgroundColor::new(Color::rgba(0.38, 0.42, 0.48, 1.0), child) }
+    }
+}
+
+impl View for Button {
+    fn handle(&mut self, input: Input, state: &InputState) -> Response {
+        let rect = self.contents.rect();
+
+        match input {
+            Input::MouseEnter => {
+                self.inside = true;
+            }
+            Input::MouseLeave => {
+                self.inside = false;
+                self.down = false;
+            }
+            Input::MouseDown(..) => {
+                if self.inside {
+                    self.down = true;
+                }
+            }
+            Input::MouseUp(..) => {
+                if self.down {
+                    println!("click");
+                    self.down = false;
+                }
+            }
+            _ => {
+                self.contents.handle(input, state);
+            }
+        }
+
+        self.contents.color = if self.down {
+            Color::rgba(0.141, 0.44, 0.77, 1.0)
+        } else if self.inside {
+            Color::rgba(0.54, 0.63, 0.71, 1.0)
+        } else {
+            Color::rgba(0.38, 0.42, 0.48, 1.0)
+        };
+
+        Response::None
+    }
+
+    fn layout(&mut self, max_width: f32, max_height: f32) {
+        self.contents.layout(max_width, max_height);
+    }
+
+    fn offset(&mut self, x: f32, y: f32) {
+        self.contents.offset(x, y);
+    }
+
+    fn render(&mut self, frame: &mut Frame) {
+        self.contents.render(frame);
+    }
+
+    fn rect(&self) -> Rect {
+        self.contents.rect()
+    }
+}
