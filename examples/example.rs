@@ -20,13 +20,13 @@ fn main() {
 
     let mut font = Font::from_bytes(include_bytes!("../res/SourceSansPro-Regular.ttf")).unwrap();
 
-    let mut root = BackgroundColor::new(
+    let mut root = Elem::new(Box::new(BackgroundColor::new(
         Color::rgba(1.0, 0.0, 1.0, 1.0),
         Box::new(Padding::new(
             5.0,
             Box::new(Text::new(font, 14.0, "jackdaws love my".to_string())),
         )),
-    );
+    )));
 
     let mut input_state = InputState {
         mouse_x: 0.0,

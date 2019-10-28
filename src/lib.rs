@@ -15,6 +15,65 @@ pub trait View: Any {
     fn rect(&self) -> Rect;
 }
 
+pub struct Elem {
+    inside: bool,
+    view: Box<dyn View>,
+}
+
+impl Elem {
+    pub fn new(view: Box<dyn View>) -> Elem {
+        Elem { inside: false, view }
+    }
+
+    pub fn handle(&mut self, input: Input, state: &InputState) -> Response {
+        match input {
+            Input::MouseMove | Input::MouseEnter | Input::MouseLeave => {
+                if self.view.rect().contains(state.mouse_x, state.mouse_y) {
+                    if self.inside {
+                        self.view.handle(Input::MouseMove, state)
+                    } else {
+                        self.inside = true;
+                        self.view.handle(Input::MouseEnter, state)
+                    }
+                } else {
+                    if self.inside {
+                        self.inside = false;
+                        self.view.handle(Input::MouseLeave, state)
+                    } else {
+                        Response::None
+                    }
+                }
+            }
+            Input::MouseDown(..) | Input::MouseUp(..) | Input::Scroll(..) => {
+                if self.inside {
+                    self.view.handle(input, state)
+                } else {
+                    Response::None
+                }
+            }
+            Input::KeyDown(..) | Input::KeyUp(..) | Input::Char(..) => {
+                self.view.handle(input, state)
+            }
+        }
+    }
+
+    pub fn layout(&mut self, max_width: f32, max_height: f32) {
+        self.view.layout(max_width, max_height);
+    }
+
+    pub fn offset(&mut self, x: f32, y: f32) {
+        self.view.offset(x, y);
+    }
+
+    pub fn render(&mut self, frame: &mut Frame) {
+        self.view.render(frame);
+    }
+
+    pub fn rect(&self) -> Rect {
+        self.view.rect()
+    }
+}
+
 pub enum Response {
     None,
 }
