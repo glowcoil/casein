@@ -20,7 +20,10 @@ fn main() {
 
     let mut font = Font::from_bytes(include_bytes!("../res/SourceSansPro-Regular.ttf")).unwrap();
 
-    let mut root = Text::new(font, 14.0, "jackdaws love my".to_string());
+    let mut root = BackgroundColor::new(
+        Color::rgba(1.0, 0.0, 1.0, 1.0),
+        Box::new(Text::new(font, 14.0, "jackdaws love my".to_string())),
+    );
 
     let mut running = true;
     let mut now = std::time::Instant::now();

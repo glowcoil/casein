@@ -38,6 +38,42 @@ impl Rect {
     }
 }
 
+pub struct BackgroundColor {
+    color: Color,
+    child: Box<dyn View>,
+}
+
+impl BackgroundColor {
+    pub fn new(color: Color, child: Box<dyn View>) -> BackgroundColor {
+        BackgroundColor { color, child }
+    }
+}
+
+impl View for BackgroundColor {
+    fn handle(&mut self, input: Input, state: &InputState) -> Response {
+        self.child.handle(input, state)
+    }
+
+    fn layout(&mut self, max_width: f32, max_height: f32) {
+        self.child.layout(max_width, max_height);
+    }
+
+    fn offset(&mut self, x: f32, y: f32) {
+        self.child.offset(x, y);
+    }
+
+    fn render(&mut self, frame: &mut Frame) {
+        let rect = self.child.rect();
+        frame.draw_rect(rect.x, rect.y, rect.width, rect.height, Mat2x2::id(), self.color);
+
+        self.child.render(frame);
+    }
+
+    fn rect(&self) -> Rect {
+        self.child.rect()
+    }
+}
+
 pub struct Text {
     font: Font<'static>,
     size: f32,
