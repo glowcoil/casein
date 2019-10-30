@@ -20,7 +20,7 @@ fn main() {
 
     let mut font = Font::from_bytes(include_bytes!("../res/SourceSansPro-Regular.ttf")).unwrap();
 
-    let mut root = Elem::new(Box::new(Button::new(
+    let mut root = SingleElem::new(Box::new(Button::new(
         Box::new(Padding::new(
             5.0,
             Box::new(Text::new(font, 14.0, "jackdaws love my".to_string())),

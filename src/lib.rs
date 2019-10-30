@@ -7,7 +7,7 @@ use std::any::Any;
 use gouache::{Color, Frame, Font, Vec2, Mat2x2, TextLayout};
 use input::{Input, InputState};
 
-pub trait View: Any {
+pub trait Elem: Any {
     fn handle(&mut self, input: Input, state: &InputState) -> Response;
     fn layout(&mut self, max_width: f32, max_height: f32);
     fn offset(&mut self, x: f32, y: f32);
@@ -15,30 +15,30 @@ pub trait View: Any {
     fn rect(&self) -> Rect;
 }
 
-pub struct Elem {
+pub struct SingleElem {
     inside: bool,
-    view: Box<dyn View>,
+    elem: Box<dyn Elem>,
 }
 
-impl Elem {
-    pub fn new(view: Box<dyn View>) -> Elem {
-        Elem { inside: false, view }
+impl SingleElem {
+    pub fn new(elem: Box<dyn Elem>) -> SingleElem {
+        SingleElem { inside: false, elem }
     }
 
     pub fn handle(&mut self, input: Input, state: &InputState) -> Response {
         match input {
             Input::MouseMove | Input::MouseEnter | Input::MouseLeave => {
-                if self.view.rect().contains(state.mouse_x, state.mouse_y) {
+                if self.elem.rect().contains(state.mouse_x, state.mouse_y) {
                     if self.inside {
-                        self.view.handle(Input::MouseMove, state)
+                        self.elem.handle(Input::MouseMove, state)
                     } else {
                         self.inside = true;
-                        self.view.handle(Input::MouseEnter, state)
+                        self.elem.handle(Input::MouseEnter, state)
                     }
                 } else {
                     if self.inside {
                         self.inside = false;
-                        self.view.handle(Input::MouseLeave, state)
+                        self.elem.handle(Input::MouseLeave, state)
                     } else {
                         Response::None
                     }
@@ -46,31 +46,31 @@ impl Elem {
             }
             Input::MouseDown(..) | Input::MouseUp(..) | Input::Scroll(..) => {
                 if self.inside {
-                    self.view.handle(input, state)
+                    self.elem.handle(input, state)
                 } else {
                     Response::None
                 }
             }
             Input::KeyDown(..) | Input::KeyUp(..) | Input::Char(..) => {
-                self.view.handle(input, state)
+                self.elem.handle(input, state)
             }
         }
     }
 
     pub fn layout(&mut self, max_width: f32, max_height: f32) {
-        self.view.layout(max_width, max_height);
+        self.elem.layout(max_width, max_height);
     }
 
     pub fn offset(&mut self, x: f32, y: f32) {
-        self.view.offset(x, y);
+        self.elem.offset(x, y);
     }
 
     pub fn render(&mut self, frame: &mut Frame) {
-        self.view.render(frame);
+        self.elem.render(frame);
     }
 
     pub fn rect(&self) -> Rect {
-        self.view.rect()
+        self.elem.rect()
     }
 }
 
@@ -101,16 +101,16 @@ pub struct Padding {
     padding: f32,
     rect: Rect,
     inside_child: bool,
-    child: Box<dyn View>,
+    child: Box<dyn Elem>,
 }
 
 impl Padding {
-    pub fn new(padding: f32, child: Box<dyn View>) -> Padding {
+    pub fn new(padding: f32, child: Box<dyn Elem>) -> Padding {
         Padding { padding, child, inside_child: false, rect: Rect::new(0.0, 0.0, 0.0, 0.0) }
     }
 }
 
-impl View for Padding {
+impl Elem for Padding {
     fn handle(&mut self, input: Input, state: &InputState) -> Response {
         self.child.handle(input, state)
     }
@@ -139,16 +139,16 @@ impl View for Padding {
 
 pub struct BackgroundColor {
     color: Color,
-    child: Box<dyn View>,
+    child: Box<dyn Elem>,
 }
 
 impl BackgroundColor {
-    pub fn new(color: Color, child: Box<dyn View>) -> BackgroundColor {
+    pub fn new(color: Color, child: Box<dyn Elem>) -> BackgroundColor {
         BackgroundColor { color, child }
     }
 }
 
-impl View for BackgroundColor {
+impl Elem for BackgroundColor {
     fn handle(&mut self, input: Input, state: &InputState) -> Response {
         self.child.handle(input, state)
     }
@@ -187,7 +187,7 @@ impl Text {
     }
 }
 
-impl View for Text {
+impl Elem for Text {
     fn handle(&mut self, input: Input, state: &InputState) -> Response {
         Response::None
     }
@@ -219,12 +219,12 @@ pub struct Button {
 }
 
 impl Button {
-    pub fn new(child: Box<dyn View>) -> Button {
+    pub fn new(child: Box<dyn Elem>) -> Button {
         Button { inside: false, down: false, contents: BackgroundColor::new(Color::rgba(0.38, 0.42, 0.48, 1.0), child) }
     }
 }
 
-impl View for Button {
+impl Elem for Button {
     fn handle(&mut self, input: Input, state: &InputState) -> Response {
         let rect = self.contents.rect();
 
