@@ -17,16 +17,17 @@ pub trait Elem: Any {
 
 pub struct SingleElem {
     inside: bool,
+    mouse_captured: bool,
     elem: Box<dyn Elem>,
 }
 
 impl SingleElem {
     pub fn new(elem: Box<dyn Elem>) -> SingleElem {
-        SingleElem { inside: false, elem }
+        SingleElem { inside: false, mouse_captured: false, elem }
     }
 
     pub fn handle(&mut self, input: Input, state: &InputState) -> Response {
-        match input {
+        let response = match input {
             Input::MouseMove | Input::MouseEnter | Input::MouseLeave => {
                 if self.elem.rect().contains(state.mouse_x, state.mouse_y) {
                     if self.inside {
@@ -35,26 +36,34 @@ impl SingleElem {
                         self.inside = true;
                         self.elem.handle(Input::MouseEnter, state)
                     }
+                } else if self.inside {
+                    self.inside = false;
+                    self.elem.handle(Input::MouseLeave, state)
+                } else if self.mouse_captured {
+                    self.elem.handle(Input::MouseMove, state)
                 } else {
-                    if self.inside {
-                        self.inside = false;
-                        self.elem.handle(Input::MouseLeave, state)
-                    } else {
-                        Response::None
-                    }
+                    Response::default()
                 }
             }
             Input::MouseDown(..) | Input::MouseUp(..) | Input::Scroll(..) => {
-                if self.inside {
+                if self.inside || self.mouse_captured {
                     self.elem.handle(input, state)
                 } else {
-                    Response::None
+                    Response::default()
                 }
             }
             Input::KeyDown(..) | Input::KeyUp(..) | Input::Char(..) => {
                 self.elem.handle(input, state)
             }
+        };
+
+        if response.capture_mouse {
+            self.mouse_captured = true;
+        } else {
+            self.mouse_captured = false;
         }
+
+        response
     }
 
     pub fn layout(&mut self, max_width: f32, max_height: f32) {
@@ -74,8 +83,23 @@ impl SingleElem {
     }
 }
 
-pub enum Response {
-    None,
+pub struct Response {
+    capture_mouse: bool,
+}
+
+impl Response {
+    pub fn capture_mouse(mut self) -> Self {
+        self.capture_mouse = true;
+        self
+    }
+}
+
+impl Default for Response {
+    fn default() -> Response {
+        Response {
+            capture_mouse: false,
+        }
+    }
 }
 
 #[derive(Copy, Clone)]
@@ -189,7 +213,7 @@ impl Text {
 
 impl Elem for Text {
     fn handle(&mut self, input: Input, state: &InputState) -> Response {
-        Response::None
+        Response::default()
     }
 
     fn layout(&mut self, max_width: f32, max_height: f32) {
@@ -234,7 +258,6 @@ impl Elem for Button {
             }
             Input::MouseLeave => {
                 self.inside = false;
-                self.down = false;
             }
             Input::MouseDown(..) => {
                 if self.inside {
@@ -242,10 +265,10 @@ impl Elem for Button {
                 }
             }
             Input::MouseUp(..) => {
-                if self.down {
+                if self.inside && self.down {
                     println!("click");
-                    self.down = false;
                 }
+                self.down = false;
             }
             _ => {
                 self.contents.handle(input, state);
@@ -260,7 +283,11 @@ impl Elem for Button {
             Color::rgba(0.38, 0.42, 0.48, 1.0)
         };
 
-        Response::None
+        if self.down {
+            Response::default().capture_mouse()
+        } else {
+            Response::default()
+        }
     }
 
     fn layout(&mut self, max_width: f32, max_height: f32) {
