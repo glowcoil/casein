@@ -16,15 +16,15 @@ pub trait Elem: Any {
     fn rect(&self) -> Rect;
 }
 
-pub struct SingleElem {
+pub struct Node {
     inside: bool,
     mouse_captured: bool,
     elem: Box<dyn Elem>,
 }
 
-impl SingleElem {
-    pub fn new(elem: Box<dyn Elem>) -> SingleElem {
-        SingleElem { inside: false, mouse_captured: false, elem }
+impl Node {
+    pub fn new(elem: Box<dyn Elem>) -> Node {
+        Node { inside: false, mouse_captured: false, elem }
     }
 
     pub fn handle(&mut self, input: Input, state: &InputState) -> Option<Response> {
@@ -82,19 +82,19 @@ impl SingleElem {
 
 pub struct ElemList {
     mouse_captured: Option<usize>,
-    elems: Vec<SingleElem>,
+    elems: Vec<Node>,
 }
 
 impl ElemList {
-    fn new(elems: Vec<SingleElem>) -> ElemList {
+    fn new(elems: Vec<Node>) -> ElemList {
         ElemList { mouse_captured: None, elems }
     }
 
-    fn iter(&self) -> impl Iterator<Item=&SingleElem> {
+    fn iter(&self) -> impl Iterator<Item=&Node> {
         self.elems.iter()
     }
 
-    fn iter_mut(&mut self) -> impl Iterator<Item=&mut SingleElem> {
+    fn iter_mut(&mut self) -> impl Iterator<Item=&mut Node> {
         self.elems.iter_mut()
     }
 
@@ -173,7 +173,7 @@ pub struct Row {
 }
 
 impl Row {
-    pub fn new(spacing: f32, children: Vec<SingleElem>) -> Row {
+    pub fn new(spacing: f32, children: Vec<Node>) -> Row {
         Row { spacing, children: ElemList::new(children), rect: Rect::new(0.0, 0.0, 0.0, 0.0) }
     }
 }
@@ -223,12 +223,12 @@ pub struct Padding {
     padding: f32,
     rect: Rect,
     inside_child: bool,
-    child: SingleElem,
+    child: Node,
 }
 
 impl Padding {
     pub fn new(padding: f32, child: Box<dyn Elem>) -> Padding {
-        Padding { padding, child: SingleElem::new(child), inside_child: false, rect: Rect::new(0.0, 0.0, 0.0, 0.0) }
+        Padding { padding, child: Node::new(child), inside_child: false, rect: Rect::new(0.0, 0.0, 0.0, 0.0) }
     }
 }
 

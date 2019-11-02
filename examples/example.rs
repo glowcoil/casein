@@ -25,13 +25,13 @@ fn main() {
     let mut root = Row::new(
         5.0,
         vec![
-            SingleElem::new(Box::new(Button::new(
+            Node::new(Box::new(Button::new(
                 Box::new(Padding::new(
                     5.0,
                     Box::new(Text::new(font.clone(), 14.0, "jackdaws love my".to_string())),
                 )),
             ))),
-            SingleElem::new(Box::new(Button::new(
+            Node::new(Box::new(Button::new(
                 Box::new(Padding::new(
                     5.0,
                     Box::new(Text::new(font.clone(), 14.0, "big sphinx of quartz".to_string())),
