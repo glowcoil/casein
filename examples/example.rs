@@ -1,3 +1,5 @@
+use std::rc::Rc;
+
 use gouache::{Color, Frame, Font, Cache, renderers::GlRenderer};
 use casein::{*, input::*};
 
@@ -18,14 +20,25 @@ fn main() {
     let mut cache = Cache::new();
     let mut renderer = GlRenderer::new();
 
-    let mut font = Font::from_bytes(include_bytes!("../res/SourceSansPro-Regular.ttf")).unwrap();
+    let mut font = Rc::new(Font::from_bytes(include_bytes!("../res/SourceSansPro-Regular.ttf")).unwrap());
 
-    let mut root = SingleElem::new(Box::new(Button::new(
-        Box::new(Padding::new(
-            5.0,
-            Box::new(Text::new(font, 14.0, "jackdaws love my".to_string())),
-        )),
-    )));
+    let mut root = Row::new(
+        5.0,
+        vec![
+            SingleElem::new(Box::new(Button::new(
+                Box::new(Padding::new(
+                    5.0,
+                    Box::new(Text::new(font.clone(), 14.0, "jackdaws love my".to_string())),
+                )),
+            ))),
+            SingleElem::new(Box::new(Button::new(
+                Box::new(Padding::new(
+                    5.0,
+                    Box::new(Text::new(font.clone(), 14.0, "big sphinx of quartz".to_string())),
+                )),
+            ))),
+        ],
+    );
 
     let mut input_state = InputState {
         mouse_x: 0.0,

@@ -3,6 +3,7 @@ pub use gouache;
 pub mod input;
 
 use std::any::Any;
+use std::rc::Rc;
 
 use gouache::{Color, Frame, Font, Vec2, Mat2x2, TextLayout};
 use input::{Input, InputState};
@@ -165,16 +166,69 @@ impl Rect {
     }
 }
 
+pub struct Row {
+    spacing: f32,
+    children: ElemList,
+    rect: Rect,
+}
+
+impl Row {
+    pub fn new(spacing: f32, children: Vec<SingleElem>) -> Row {
+        Row { spacing, children: ElemList::new(children), rect: Rect::new(0.0, 0.0, 0.0, 0.0) }
+    }
+}
+
+impl Elem for Row {
+    fn handle(&mut self, input: Input, state: &InputState) -> Option<Response> {
+        self.children.handle(input, state)
+    }
+
+    fn layout(&mut self, max_width: f32, max_height: f32) {
+        let mut width: f32 = 0.0;
+        let mut height: f32 = 0.0;
+        for child in self.children.iter_mut() {
+            child.layout(std::f32::INFINITY, max_height);
+            let rect = child.rect();
+            width += rect.width + self.spacing;
+            height = height.max(rect.height);
+        }
+
+        self.rect.width = width;
+        self.rect.height = height;
+    }
+
+    fn offset(&mut self, x: f32, y: f32) {
+        self.rect.x = x;
+        self.rect.y = y;
+
+        let mut x = x;
+        for child in self.children.iter_mut() {
+            child.offset(x, y);
+            x += child.rect().width + self.spacing;
+        }
+    }
+
+    fn render(&mut self, frame: &mut Frame) {
+        for child in self.children.iter_mut() {
+            child.render(frame);
+        }
+    }
+
+    fn rect(&self) -> Rect {
+        self.rect
+    }
+}
+
 pub struct Padding {
     padding: f32,
     rect: Rect,
     inside_child: bool,
-    child: Box<dyn Elem>,
+    child: SingleElem,
 }
 
 impl Padding {
     pub fn new(padding: f32, child: Box<dyn Elem>) -> Padding {
-        Padding { padding, child, inside_child: false, rect: Rect::new(0.0, 0.0, 0.0, 0.0) }
+        Padding { padding, child: SingleElem::new(child), inside_child: false, rect: Rect::new(0.0, 0.0, 0.0, 0.0) }
     }
 }
 
@@ -242,7 +296,7 @@ impl Elem for BackgroundColor {
 }
 
 pub struct Text {
-    font: Font<'static>,
+    font: Rc<Font<'static>>,
     size: f32,
     text: String,
     rect: Rect,
@@ -250,7 +304,7 @@ pub struct Text {
 }
 
 impl Text {
-    pub fn new(font: Font<'static>, size: f32, text: String) -> Text {
+    pub fn new(font: Rc<Font<'static>>, size: f32, text: String) -> Text {
         Text { font, size, text, rect: Rect::new(0.0, 0.0, 0.0, 0.0), layout: TextLayout::empty() }
     }
 }
