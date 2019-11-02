@@ -8,7 +8,7 @@ use gouache::{Color, Frame, Font, Vec2, Mat2x2, TextLayout};
 use input::{Input, InputState};
 
 pub trait Elem: Any {
-    fn handle(&mut self, input: Input, state: &InputState) -> Response;
+    fn handle(&mut self, input: Input, state: &InputState) -> Option<Response>;
     fn layout(&mut self, max_width: f32, max_height: f32);
     fn offset(&mut self, x: f32, y: f32);
     fn render(&mut self, frame: &mut Frame);
@@ -26,7 +26,7 @@ impl SingleElem {
         SingleElem { inside: false, mouse_captured: false, elem }
     }
 
-    pub fn handle(&mut self, input: Input, state: &InputState) -> Response {
+    pub fn handle(&mut self, input: Input, state: &InputState) -> Option<Response> {
         let response = match input {
             Input::MouseMove | Input::MouseEnter | Input::MouseLeave => {
                 if self.elem.rect().contains(state.mouse_x, state.mouse_y) {
@@ -42,14 +42,14 @@ impl SingleElem {
                 } else if self.mouse_captured {
                     self.elem.handle(Input::MouseMove, state)
                 } else {
-                    Response::default()
+                    None
                 }
             }
             Input::MouseDown(..) | Input::MouseUp(..) | Input::Scroll(..) => {
                 if self.inside || self.mouse_captured {
                     self.elem.handle(input, state)
                 } else {
-                    Response::default()
+                    None
                 }
             }
             Input::KeyDown(..) | Input::KeyUp(..) | Input::Char(..) => {
@@ -57,11 +57,7 @@ impl SingleElem {
             }
         };
 
-        if response.capture_mouse {
-            self.mouse_captured = true;
-        } else {
-            self.mouse_captured = false;
-        }
+        self.mouse_captured = response.map_or(false, |r| r.capture_mouse);
 
         response
     }
@@ -83,14 +79,14 @@ impl SingleElem {
     }
 }
 
+#[derive(Copy, Clone)]
 pub struct Response {
     capture_mouse: bool,
 }
 
 impl Response {
-    pub fn capture_mouse(mut self) -> Self {
-        self.capture_mouse = true;
-        self
+    pub fn capture_mouse(self) -> Self {
+        Response { capture_mouse: true, ..self }
     }
 }
 
@@ -135,7 +131,7 @@ impl Padding {
 }
 
 impl Elem for Padding {
-    fn handle(&mut self, input: Input, state: &InputState) -> Response {
+    fn handle(&mut self, input: Input, state: &InputState) -> Option<Response> {
         self.child.handle(input, state)
     }
 
@@ -173,7 +169,7 @@ impl BackgroundColor {
 }
 
 impl Elem for BackgroundColor {
-    fn handle(&mut self, input: Input, state: &InputState) -> Response {
+    fn handle(&mut self, input: Input, state: &InputState) -> Option<Response> {
         self.child.handle(input, state)
     }
 
@@ -212,8 +208,8 @@ impl Text {
 }
 
 impl Elem for Text {
-    fn handle(&mut self, input: Input, state: &InputState) -> Response {
-        Response::default()
+    fn handle(&mut self, input: Input, state: &InputState) -> Option<Response> {
+        None
     }
 
     fn layout(&mut self, max_width: f32, max_height: f32) {
@@ -249,7 +245,7 @@ impl Button {
 }
 
 impl Elem for Button {
-    fn handle(&mut self, input: Input, state: &InputState) -> Response {
+    fn handle(&mut self, input: Input, state: &InputState) -> Option<Response> {
         let rect = self.contents.rect();
 
         match input {
@@ -284,9 +280,9 @@ impl Elem for Button {
         };
 
         if self.down {
-            Response::default().capture_mouse()
+            Some(Response::default().capture_mouse())
         } else {
-            Response::default()
+            None
         }
     }
 
