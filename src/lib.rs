@@ -79,6 +79,54 @@ impl SingleElem {
     }
 }
 
+pub struct ElemList {
+    mouse_captured: Option<usize>,
+    elems: Vec<SingleElem>,
+}
+
+impl ElemList {
+    fn new(elems: Vec<SingleElem>) -> ElemList {
+        ElemList { mouse_captured: None, elems }
+    }
+
+    fn iter(&self) -> impl Iterator<Item=&SingleElem> {
+        self.elems.iter()
+    }
+
+    fn iter_mut(&mut self) -> impl Iterator<Item=&mut SingleElem> {
+        self.elems.iter_mut()
+    }
+
+    fn handle(&mut self, input: Input, state: &InputState) -> Option<Response> {
+        match input {
+            Input::MouseMove | Input::MouseEnter | Input::MouseLeave |
+            Input::MouseDown(..) | Input::MouseUp(..) | Input::Scroll(..) => {
+                if let Some(i) = self.mouse_captured {
+                    let response = self.elems[i].handle(input, state);
+                    if !response.map_or(false, |r| r.capture_mouse) {
+                        self.mouse_captured = None;
+                    }
+                    return response;
+                }
+
+                for (i, elem) in self.elems.iter_mut().enumerate() {
+                    let response = elem.handle(input, state);
+                    if let Some(response) = response {
+                        if response.capture_mouse {
+                            self.mouse_captured = Some(i);
+                        }
+                        return Some(response);
+                    }
+                }
+                None
+            }
+            Input::KeyDown(..) | Input::KeyUp(..) | Input::Char(..) => {
+                None
+            }
+        }
+    }
+}
+
 #[derive(Copy, Clone)]
 pub struct Response {
     capture_mouse: bool,
