@@ -2,11 +2,28 @@ pub use gouache;
 
 pub mod input;
 
-use std::any::Any;
+use std::any::{Any, TypeId};
+use std::cell::Cell;
 use std::rc::Rc;
 
 use gouache::{Color, Frame, Font, Vec2, Mat2x2, TextLayout};
 use input::{Input, InputState};
+
+pub trait Template {
+    fn install(self, elem: &mut Node);
+}
+
+pub struct Id;
+
+impl Template for Id {
+    fn install(self, elem: &mut Node) {}
+}
+
+impl<F: FnOnce(&mut Node)> Template for F {
+    fn install(self, elem: &mut Node) {
+        self(elem)
+    }
+}
 
 pub trait Elem: Any {
     fn handle(&mut self, input: Input, state: &InputState) -> Option<Response>;
@@ -14,6 +31,10 @@ pub trait Elem: Any {
     fn offset(&mut self, x: f32, y: f32);
     fn render(&mut self, frame: &mut Frame);
     fn rect(&self) -> Rect;
+
+    fn get_type_id(&self) -> TypeId {
+        TypeId::of::<Self>()
+    }
 }
 
 pub struct Node {
@@ -25,6 +46,26 @@ pub struct Node {
 impl Node {
     pub fn new(elem: Box<dyn Elem>) -> Node {
         Node { inside: false, mouse_captured: false, elem }
+    }
+
+    pub fn get<E: Elem>(&self) -> Option<&E> {
+        if self.elem.get_type_id() == TypeId::of::<E>() {
+            Some(unsafe { &*(&*self.elem as *const dyn Elem as *const E) })
+        } else {
+            None
+        }
+    }
+
+    pub fn get_mut<E: Elem>(&mut self) -> Option<&mut E> {
+        if self.elem.get_type_id() == TypeId::of::<E>() {
+            Some(unsafe { &mut *(&mut *self.elem as *mut dyn Elem as *mut E) })
+        } else {
+            None
+        }
+    }
+
+    pub fn place<E: Elem>(&mut self, elem: E) {
+        *self = Node { inside: false, mouse_captured: false, elem: Box::new(elem) };
     }
 
     pub fn handle(&mut self, input: Input, state: &InputState) -> Option<Response> {
