@@ -259,6 +259,32 @@ impl Rect {
     }
 }
 
+pub struct Receiver<T>(Rc<Cell<Vec<T>>>);
+
+impl<T> Receiver<T> {
+    pub fn new() -> Receiver<T> {
+        Receiver(Rc::new(Cell::new(Vec::new())))
+    }
+
+    pub fn sender(&self) -> Sender<T> {
+        Sender(self.0.clone())
+    }
+
+    pub fn drain(&mut self) -> impl Iterator<Item=T> {
+        self.0.replace(Vec::new()).into_iter()
+    }
+}
+
+pub struct Sender<T>(Rc<Cell<Vec<T>>>);
+
+impl<T> Sender<T> {
+    pub fn send(&self, value: T) {
+        let mut queue = self.0.replace(Vec::new());
+        queue.push(value);
+        self.0.set(queue);
+    }
+}
+
 struct Empty;
 
 impl Elem for Empty {

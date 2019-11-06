@@ -22,6 +22,9 @@ fn main() {
 
     let font = Rc::new(Font::from_bytes(include_bytes!("../res/SourceSansPro-Regular.ttf")).unwrap());
 
+    let mut recv = Receiver::new();
+    let mut send = recv.sender();
+
     let mut root = Node::new();
     Row::new(
         5.0,
@@ -31,7 +34,7 @@ fn main() {
                     5.0,
                     Text::new(font.clone(), 14.0, "jackdaws love my".to_string()),
                 ),
-            ).on_click(|| { println!("click") }),
+            ).on_click(move || { send.send(()) }),
             Button::new(
                 Padding::new(
                     5.0,
@@ -50,6 +53,10 @@ fn main() {
     let mut running = true;
     let mut now = std::time::Instant::now();
     while running {
+        for _ in recv.drain() {
+            println!("click");
+        }
+
         let size = context.window().get_inner_size().unwrap();
 
         let mut frame = Frame::new(&mut cache, &mut renderer, size.width as f32, size.height as f32);
