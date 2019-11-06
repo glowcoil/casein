@@ -23,11 +23,22 @@ fn main() {
     let font = Rc::new(Font::from_bytes(include_bytes!("../res/SourceSansPro-Regular.ttf")).unwrap());
 
     let mut root = Node::new();
-    Button::new(
-        Padding::new(
-            5.0,
-            Text::new(font.clone(), 14.0, "jackdaws love my".to_string()),
-        ),
+    Row::new(
+        5.0,
+        children![
+            Button::new(
+                Padding::new(
+                    5.0,
+                    Text::new(font.clone(), 14.0, "jackdaws love my".to_string()),
+                ),
+            ),
+            Button::new(
+                Padding::new(
+                    5.0,
+                    Text::new(font.clone(), 14.0, "big sphinx of quartz".to_string()),
+                ),
+            ),
+        ],
     ).install(&mut root);
 
     let mut input_state = InputState {

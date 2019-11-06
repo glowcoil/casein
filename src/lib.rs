@@ -25,6 +25,26 @@ impl<F: FnOnce(&mut Node)> Template for F {
     }
 }
 
+pub trait ListTemplate {
+    fn install(self, list: Cursor);
+}
+
+impl<F: FnOnce(Cursor)> ListTemplate for F {
+    fn install(self, elem: Cursor) {
+        self(elem)
+    }
+}
+
+#[macro_export]
+macro_rules! children {
+    ($($child:expr),*) => (
+        |mut cursor: Cursor| {
+            $($child.install(cursor.next());)*
+        }
+    );
+    ($($child:expr,)*) => ($crate::children![$($child),*])
+}
+
 pub trait Elem: Any {
     fn handle(&mut self, input: Input, state: &InputState) -> Option<Response>;
     fn layout(&mut self, max_width: f32, max_height: f32);
@@ -121,25 +141,29 @@ impl Node {
     }
 }
 
-pub struct ElemList {
+pub struct NodeList {
     mouse_captured: Option<usize>,
     elems: Vec<Node>,
 }
 
-impl ElemList {
-    fn new(elems: Vec<Node>) -> ElemList {
-        ElemList { mouse_captured: None, elems }
+impl NodeList {
+    pub fn new() -> NodeList {
+        NodeList { mouse_captured: None, elems: Vec::new() }
     }
 
-    fn iter(&self) -> impl Iterator<Item=&Node> {
+    pub fn cursor<'a>(&'a mut self) -> Cursor<'a> {
+        Cursor::new(self)
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item=&Node> {
         self.elems.iter()
     }
 
-    fn iter_mut(&mut self) -> impl Iterator<Item=&mut Node> {
+    pub fn iter_mut(&mut self) -> impl Iterator<Item=&mut Node> {
         self.elems.iter_mut()
     }
 
-    fn handle(&mut self, input: Input, state: &InputState) -> Option<Response> {
+    pub fn handle(&mut self, input: Input, state: &InputState) -> Option<Response> {
         match input {
             Input::MouseMove | Input::MouseEnter | Input::MouseLeave |
             Input::MouseDown(..) | Input::MouseUp(..) | Input::Scroll(..) => {
@@ -166,6 +190,34 @@ impl ElemList {
                 None
             }
         }
+    }
+}
+
+pub struct Cursor<'a> {
+    i: usize,
+    list: &'a mut NodeList,
+}
+
+impl<'a> Cursor<'a> {
+    fn new(list: &mut NodeList) -> Cursor {
+        Cursor { i: 0, list }
+    }
+
+    pub fn next(&mut self) -> &mut Node {
+        let result = if self.i < self.list.elems.len() {
+            self.list.elems.get_mut(self.i).unwrap()
+        } else {
+            self.list.elems.push(Node::new());
+            self.list.elems.last_mut().unwrap()
+        };
+        self.i += 1;
+        result
+    }
+}
+
+impl<'a> Drop for Cursor<'a> {
+    fn drop(&mut self) {
+        self.list.elems.truncate(self.i);
     }
 }
 
@@ -225,58 +277,67 @@ impl Elem for Empty {
     }
 }
 
-// pub struct Row {
-//     spacing: f32,
-//     children: ElemList,
-//     rect: Rect,
-// }
+pub struct Row {
+    spacing: f32,
+    children: NodeList,
+    rect: Rect,
+}
 
-// impl Row {
-//     pub fn new(spacing: f32, children: Vec<Node>) -> Row {
-//         Row { spacing, children: ElemList::new(children), rect: Rect::new(0.0, 0.0, 0.0, 0.0) }
-//     }
-// }
+impl Row {
+    pub fn new(spacing: f32, children: impl ListTemplate) -> impl Template {
+        move |node: &mut Node| {
+            if let Some(elem) = node.get_mut::<Row>() {
+                elem.spacing = spacing;
+                children.install(elem.children.cursor());
+            } else {
+                let mut row = Row { spacing, children: NodeList::new(), rect: Rect::new(0.0, 0.0, 0.0, 0.0) };
+                children.install(row.children.cursor());
+                node.place(row);
+            }
+        }
+    }
+}
 
-// impl Elem for Row {
-//     fn handle(&mut self, input: Input, state: &InputState) -> Option<Response> {
-//         self.children.handle(input, state)
-//     }
+impl Elem for Row {
+    fn handle(&mut self, input: Input, state: &InputState) -> Option<Response> {
+        self.children.handle(input, state)
+    }
 
-//     fn layout(&mut self, max_width: f32, max_height: f32) {
-//         let mut width: f32 = 0.0;
-//         let mut height: f32 = 0.0;
-//         for child in self.children.iter_mut() {
-//             child.layout(std::f32::INFINITY, max_height);
-//             let rect = child.rect();
-//             width += rect.width + self.spacing;
-//             height = height.max(rect.height);
-//         }
+    fn layout(&mut self, max_width: f32, max_height: f32) {
+        let mut width: f32 = 0.0;
+        let mut height: f32 = 0.0;
+        for child in self.children.iter_mut() {
+            child.layout(std::f32::INFINITY, max_height);
+            let rect = child.rect();
+            width += rect.width + self.spacing;
+            height = height.max(rect.height);
+        }
 
-//         self.rect.width = width;
-//         self.rect.height = height;
-//     }
+        self.rect.width = width;
+        self.rect.height = height;
+    }
 
-//     fn offset(&mut self, x: f32, y: f32) {
-//         self.rect.x = x;
-//         self.rect.y = y;
+    fn offset(&mut self, x: f32, y: f32) {
+        self.rect.x = x;
+        self.rect.y = y;
 
-//         let mut x = x;
-//         for child in self.children.iter_mut() {
-//             child.offset(x, y);
-//             x += child.rect().width + self.spacing;
-//         }
-//     }
+        let mut x = x;
+        for child in self.children.iter_mut() {
+            child.offset(x, y);
+            x += child.rect().width + self.spacing;
+        }
+    }
 
-//     fn render(&mut self, frame: &mut Frame) {
-//         for child in self.children.iter_mut() {
-//             child.render(frame);
-//         }
-//     }
+    fn render(&mut self, frame: &mut Frame) {
+        for child in self.children.iter_mut() {
+            child.render(frame);
+        }
+    }
 
-//     fn rect(&self) -> Rect {
-//         self.rect
-//     }
-// }
+    fn rect(&self) -> Rect {
+        self.rect
+    }
+}
 
 pub struct Padding {
     padding: f32,
