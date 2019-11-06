@@ -44,8 +44,8 @@ pub struct Node {
 }
 
 impl Node {
-    pub fn new(elem: Box<dyn Elem>) -> Node {
-        Node { inside: false, mouse_captured: false, elem }
+    pub fn new() -> Node {
+        Node { inside: false, mouse_captured: false, elem: Box::new(Empty) }
     }
 
     pub fn get<E: Elem>(&self) -> Option<&E> {
@@ -207,58 +207,76 @@ impl Rect {
     }
 }
 
-pub struct Row {
-    spacing: f32,
-    children: ElemList,
-    rect: Rect,
-}
+struct Empty;
 
-impl Row {
-    pub fn new(spacing: f32, children: Vec<Node>) -> Row {
-        Row { spacing, children: ElemList::new(children), rect: Rect::new(0.0, 0.0, 0.0, 0.0) }
-    }
-}
-
-impl Elem for Row {
+impl Elem for Empty {
     fn handle(&mut self, input: Input, state: &InputState) -> Option<Response> {
-        self.children.handle(input, state)
+        None
     }
 
-    fn layout(&mut self, max_width: f32, max_height: f32) {
-        let mut width: f32 = 0.0;
-        let mut height: f32 = 0.0;
-        for child in self.children.iter_mut() {
-            child.layout(std::f32::INFINITY, max_height);
-            let rect = child.rect();
-            width += rect.width + self.spacing;
-            height = height.max(rect.height);
-        }
+    fn layout(&mut self, max_width: f32, max_height: f32) {}
 
-        self.rect.width = width;
-        self.rect.height = height;
-    }
+    fn offset(&mut self, x: f32, y: f32) {}
 
-    fn offset(&mut self, x: f32, y: f32) {
-        self.rect.x = x;
-        self.rect.y = y;
-
-        let mut x = x;
-        for child in self.children.iter_mut() {
-            child.offset(x, y);
-            x += child.rect().width + self.spacing;
-        }
-    }
-
-    fn render(&mut self, frame: &mut Frame) {
-        for child in self.children.iter_mut() {
-            child.render(frame);
-        }
-    }
+    fn render(&mut self, frame: &mut Frame) {}
 
     fn rect(&self) -> Rect {
-        self.rect
+        Rect::new(0.0, 0.0, 0.0, 0.0)
     }
 }
+
+// pub struct Row {
+//     spacing: f32,
+//     children: ElemList,
+//     rect: Rect,
+// }
+
+// impl Row {
+//     pub fn new(spacing: f32, children: Vec<Node>) -> Row {
+//         Row { spacing, children: ElemList::new(children), rect: Rect::new(0.0, 0.0, 0.0, 0.0) }
+//     }
+// }
+
+// impl Elem for Row {
+//     fn handle(&mut self, input: Input, state: &InputState) -> Option<Response> {
+//         self.children.handle(input, state)
+//     }
+
+//     fn layout(&mut self, max_width: f32, max_height: f32) {
+//         let mut width: f32 = 0.0;
+//         let mut height: f32 = 0.0;
+//         for child in self.children.iter_mut() {
+//             child.layout(std::f32::INFINITY, max_height);
+//             let rect = child.rect();
+//             width += rect.width + self.spacing;
+//             height = height.max(rect.height);
+//         }
+
+//         self.rect.width = width;
+//         self.rect.height = height;
+//     }
+
+//     fn offset(&mut self, x: f32, y: f32) {
+//         self.rect.x = x;
+//         self.rect.y = y;
+
+//         let mut x = x;
+//         for child in self.children.iter_mut() {
+//             child.offset(x, y);
+//             x += child.rect().width + self.spacing;
+//         }
+//     }
+
+//     fn render(&mut self, frame: &mut Frame) {
+//         for child in self.children.iter_mut() {
+//             child.render(frame);
+//         }
+//     }
+
+//     fn rect(&self) -> Rect {
+//         self.rect
+//     }
+// }
 
 pub struct Padding {
     padding: f32,
@@ -268,8 +286,17 @@ pub struct Padding {
 }
 
 impl Padding {
-    pub fn new(padding: f32, child: Box<dyn Elem>) -> Padding {
-        Padding { padding, child: Node::new(child), inside_child: false, rect: Rect::new(0.0, 0.0, 0.0, 0.0) }
+    pub fn new(padding: f32, child: impl Template) -> impl Template {
+        move |node: &mut Node| {
+            if let Some(elem) = node.get_mut::<Padding>() {
+                elem.padding = padding;
+                child.install(&mut elem.child);
+            } else {
+                let mut child_node = Node::new();
+                child.install(&mut child_node);
+                node.place(Padding { padding, child: child_node, inside_child: false, rect: Rect::new(0.0, 0.0, 0.0, 0.0) });
+            }
+        }
     }
 }
 
@@ -302,12 +329,21 @@ impl Elem for Padding {
 
 pub struct BackgroundColor {
     color: Color,
-    child: Box<dyn Elem>,
+    child: Node,
 }
 
 impl BackgroundColor {
-    pub fn new(color: Color, child: Box<dyn Elem>) -> BackgroundColor {
-        BackgroundColor { color, child }
+    pub fn new(color: Color, child: impl Template) -> impl Template {
+        move |node: &mut Node| {
+            if let Some(elem) = node.get_mut::<BackgroundColor>() {
+                elem.color = color;
+                child.install(&mut elem.child);
+            } else {
+                let mut child_node = Node::new();
+                child.install(&mut child_node);
+                node.place(BackgroundColor { color, child: child_node });
+            }
+        }
     }
 }
 
@@ -345,8 +381,18 @@ pub struct Text {
 }
 
 impl Text {
-    pub fn new(font: Rc<Font<'static>>, size: f32, text: String) -> Text {
-        Text { font, size, text, rect: Rect::new(0.0, 0.0, 0.0, 0.0), layout: TextLayout::empty() }
+    pub fn new(font: Rc<Font<'static>>, size: f32, text: String) -> impl Template {
+        move |node: &mut Node| {
+            if let Some(elem) = node.get_mut::<Text>() {
+                elem.font = font;
+                elem.size = size;
+                elem.text = text;
+            } else {
+                node.place(Text {
+                    font, size, text, rect: Rect::new(0.0, 0.0, 0.0, 0.0), layout: TextLayout::empty(),
+                });
+            }
+        }
     }
 }
 
@@ -378,12 +424,32 @@ impl Elem for Text {
 pub struct Button {
     inside: bool,
     down: bool,
-    contents: BackgroundColor,
+    contents: Node,
 }
 
 impl Button {
-    pub fn new(child: Box<dyn Elem>) -> Button {
-        Button { inside: false, down: false, contents: BackgroundColor::new(Color::rgba(0.38, 0.42, 0.48, 1.0), child) }
+    pub fn new(child: impl Template) -> impl Template {
+        move |node: &mut Node| {
+            if let Some(button) = node.get_mut::<Button>() {
+                button.update(child);
+            } else {
+                let mut button = Button { inside: false, down: false, contents: Node::new() };
+                button.update(child);
+                node.place(button);
+            }
+        }
+    }
+
+    fn update(&mut self, child: impl Template) {
+        let color = if self.down {
+            Color::rgba(0.141, 0.44, 0.77, 1.0)
+        } else if self.inside {
+            Color::rgba(0.54, 0.63, 0.71, 1.0)
+        } else {
+            Color::rgba(0.38, 0.42, 0.48, 1.0)
+        };
+
+        BackgroundColor::new(color, child).install(&mut self.contents);
     }
 }
 
@@ -414,13 +480,7 @@ impl Elem for Button {
             }
         }
 
-        self.contents.color = if self.down {
-            Color::rgba(0.141, 0.44, 0.77, 1.0)
-        } else if self.inside {
-            Color::rgba(0.54, 0.63, 0.71, 1.0)
-        } else {
-            Color::rgba(0.38, 0.42, 0.48, 1.0)
-        };
+        self.update(Id);
 
         if self.down {
             Some(Response::default().capture_mouse())

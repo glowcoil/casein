@@ -20,25 +20,15 @@ fn main() {
     let mut cache = Cache::new();
     let mut renderer = GlRenderer::new();
 
-    let mut font = Rc::new(Font::from_bytes(include_bytes!("../res/SourceSansPro-Regular.ttf")).unwrap());
+    let font = Rc::new(Font::from_bytes(include_bytes!("../res/SourceSansPro-Regular.ttf")).unwrap());
 
-    let mut root = Row::new(
-        5.0,
-        vec![
-            Node::new(Box::new(Button::new(
-                Box::new(Padding::new(
-                    5.0,
-                    Box::new(Text::new(font.clone(), 14.0, "jackdaws love my".to_string())),
-                )),
-            ))),
-            Node::new(Box::new(Button::new(
-                Box::new(Padding::new(
-                    5.0,
-                    Box::new(Text::new(font.clone(), 14.0, "big sphinx of quartz".to_string())),
-                )),
-            ))),
-        ],
-    );
+    let mut root = Node::new();
+    Button::new(
+        Padding::new(
+            5.0,
+            Text::new(font.clone(), 14.0, "jackdaws love my".to_string()),
+        ),
+    ).install(&mut root);
 
     let mut input_state = InputState {
         mouse_x: 0.0,
