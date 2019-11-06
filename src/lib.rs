@@ -482,23 +482,45 @@ impl Elem for Text {
     }
 }
 
+pub struct ButtonTemplate<T: Template, F: Fn() + 'static> {
+    child: T,
+    on_click: F,
+}
+
+impl<T: Template, F: Fn() + 'static> ButtonTemplate<T, F> {
+    pub fn on_click<G: Fn()>(self, on_click: G) -> ButtonTemplate<T, G> {
+        ButtonTemplate { child: self.child, on_click }
+    }
+}
+
+impl<T: Template, F: Fn() + 'static> Template for ButtonTemplate<T, F> {
+    fn install(self, node: &mut Node) {
+        if let Some(button) = node.get_mut::<Button>() {
+            button.on_click = Box::new(self.on_click);
+            button.update(self.child);
+        } else {
+            let mut button = Button {
+                inside: false,
+                down: false,
+                on_click: Box::new(self.on_click),
+                contents: Node::new()
+            };
+            button.update(self.child);
+            node.place(button);
+        }
+    }
+}
+
 pub struct Button {
     inside: bool,
     down: bool,
+    on_click: Box<dyn Fn()>,
     contents: Node,
 }
 
 impl Button {
-    pub fn new(child: impl Template) -> impl Template {
-        move |node: &mut Node| {
-            if let Some(button) = node.get_mut::<Button>() {
-                button.update(child);
-            } else {
-                let mut button = Button { inside: false, down: false, contents: Node::new() };
-                button.update(child);
-                node.place(button);
-            }
-        }
+    pub fn new<T: Template>(child: T) -> ButtonTemplate<T, impl Fn()> {
+        ButtonTemplate { child, on_click: Box::new(|| {}) }
     }
 
     fn update(&mut self, child: impl Template) {
@@ -532,7 +554,7 @@ impl Elem for Button {
             }
             Input::MouseUp(..) => {
                 if self.inside && self.down {
-                    println!("click");
+                    (self.on_click)();
                 }
                 self.down = false;
             }

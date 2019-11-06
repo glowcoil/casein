@@ -31,7 +31,7 @@ fn main() {
                     5.0,
                     Text::new(font.clone(), 14.0, "jackdaws love my".to_string()),
                 ),
-            ),
+            ).on_click(|| { println!("click") }),
             Button::new(
                 Padding::new(
                     5.0,
