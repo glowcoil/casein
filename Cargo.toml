@@ -6,7 +6,5 @@ edition = "2018"
 
 [dependencies]
 gouache = { path = "../gouache" }
-
-[dev-dependencies]
 gl = "0.11.0"
 glutin = "0.21.0"

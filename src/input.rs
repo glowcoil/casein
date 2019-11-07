@@ -20,6 +20,16 @@ pub struct InputState {
     pub modifiers: Modifiers,
 }
 
+impl Default for InputState {
+    fn default() -> InputState {
+        InputState {
+           mouse_x: 0.0,
+           mouse_y: 0.0,
+           modifiers: Modifiers::default(),
+       }
+    }
+}
+
 #[derive(Copy, Clone)]
 pub struct Modifiers {
     pub shift: bool,

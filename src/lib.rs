@@ -1,6 +1,7 @@
 pub use gouache;
 
 pub mod input;
+pub mod backends;
 
 use std::any::{Any, TypeId};
 use std::cell::Cell;
