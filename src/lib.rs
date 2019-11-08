@@ -366,6 +366,68 @@ impl Elem for Row {
     }
 }
 
+pub struct Col {
+    spacing: f32,
+    children: NodeList,
+    rect: Rect,
+}
+
+impl Col {
+    pub fn new(spacing: f32, children: impl ListTemplate) -> impl Template {
+        move |node: &mut Node| {
+            if let Some(elem) = node.get_mut::<Col>() {
+                elem.spacing = spacing;
+                children.install(elem.children.cursor());
+            } else {
+                let mut col = Col { spacing, children: NodeList::new(), rect: Rect::new(0.0, 0.0, 0.0, 0.0) };
+                children.install(col.children.cursor());
+                node.place(col);
+            }
+        }
+    }
+}
+
+impl Elem for Col {
+    fn handle(&mut self, input: Input, state: &InputState) -> Option<Response> {
+        self.children.handle(input, state)
+    }
+
+    fn layout(&mut self, max_width: f32, max_height: f32) {
+        let mut width: f32 = 0.0;
+        let mut height: f32 = 0.0;
+        for child in self.children.iter_mut() {
+            child.layout(std::f32::INFINITY, max_height);
+            let rect = child.rect();
+            width += rect.width + self.spacing;
+            height = height.max(rect.height);
+        }
+
+        self.rect.width = width;
+        self.rect.height = height;
+    }
+
+    fn offset(&mut self, x: f32, y: f32) {
+        self.rect.x = x;
+        self.rect.y = y;
+
+        let mut x = x;
+        for child in self.children.iter_mut() {
+            child.offset(x, y);
+            x += child.rect().width + self.spacing;
+        }
+    }
+
+    fn render(&mut self, frame: &mut Frame) {
+        for child in self.children.iter_mut() {
+            child.render(frame);
+        }
+    }
+
+    fn rect(&self) -> Rect {
+        self.rect
+    }
+}
+
 pub struct Padding {
     padding: f32,
     rect: Rect,
