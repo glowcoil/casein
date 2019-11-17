@@ -24,24 +24,20 @@ fn main() {
 
     let font = Rc::new(Font::from_bytes(include_bytes!("../res/SourceSansPro-Regular.ttf")).unwrap());
 
-    let size = context.window().get_inner_size().unwrap();
-
     let mut root = Node::new();
-    Row::new(5.0)
-        .child(BackgroundColor::new(
-            Color::rgba(0.38, 0.42, 0.48, 1.0),
-            Padding::new(5.0, Text::new(font.clone(), 14.0, "jackdaws love my")),
-        ))
-        .child(BackgroundColor::new(
-            Color::rgba(0.38, 0.42, 0.48, 1.0),
-            Padding::new(5.0, Text::new(font.clone(), 14.0, "big sphinx of quartz")),
-        ))
-        .apply(&mut root, Bounds::new(size.width as f32, size.height as f32));
 
     let mut running = true;
     let mut now = std::time::Instant::now();
     while running {
         let size = context.window().get_inner_size().unwrap();
+
+        Row::new(5.0)
+            .child(
+                Button::new(Text::new(font.clone(), 14.0, "jackdaws love my"))
+                    .on_click(|| println!("click"))
+            )
+            .child(Button::new(Text::new(font.clone(), 14.0, "big sphinx of quartz")))
+            .apply(&mut root, Bounds::new(size.width as f32, size.height as f32));
 
         let mut frame = Frame::new(&mut cache, &mut renderer, size.width as f32, size.height as f32);
 

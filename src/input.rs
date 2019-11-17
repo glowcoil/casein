@@ -3,8 +3,6 @@
 #[derive(Copy, Clone)]
 pub enum Input {
     MouseMove,
-    MouseEnter,
-    MouseLeave,
     MouseDown(MouseButton),
     MouseUp(MouseButton),
     Scroll(f32, f32),

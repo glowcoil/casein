@@ -65,6 +65,10 @@ pub struct Node {
     size: Vec2,
     shape: Shape,
     children: Vec<Node>,
+
+    hover: bool,
+    dragging: bool,
+    events: Vec<(Input, InputState)>,
 }
 
 impl Node {
@@ -79,6 +83,10 @@ impl Node {
             size: Vec2::new(0.0, 0.0),
             shape: Shape::Empty,
             children: Vec::new(),
+
+            hover: false,
+            dragging: false,
+            events: Vec::new(),
         }
     }
 
@@ -129,6 +137,18 @@ impl Node {
         Cursor { node: self, index: 0 }
     }
 
+    pub fn poll(&mut self) -> impl Iterator<Item=(Input, InputState)> {
+        std::mem::replace(&mut self.events, Vec::new()).into_iter()
+    }
+
+    pub fn hover(&self) -> bool {
+        self.hover
+    }
+
+    pub fn dragging(&self) -> bool {
+        self.dragging
+    }
+
     pub fn render(&self, frame: &mut Frame) {
         self.render_inner(frame, Vec2::new(0.0, 0.0))
     }
@@ -154,7 +174,59 @@ impl Node {
         }
     }
 
-    pub fn input(&mut self, input: Input, input_state: &InputState) {}
+    pub fn input(&mut self, input: Input, input_state: &InputState) {
+        self.input_inner(input, input_state, Vec2::new(0.0, 0.0));
+    }
+
+    fn input_inner(&mut self, input: Input, input_state: &InputState, offset: Vec2) {
+        let offset = offset + self.offset;
+
+        match input {
+            Input::MouseMove => {
+                let hover =
+                    input_state.mouse_x >= offset.x && input_state.mouse_x < offset.x + self.size.x &&
+                    input_state.mouse_y >= offset.y && input_state.mouse_y < offset.y + self.size.y;
+
+                if self.dragging || self.hover || hover {
+                    self.events.push((input, *input_state));
+                    for child in self.children.iter_mut() {
+                        child.input_inner(input, input_state, offset);
+                    }
+                }
+
+                self.hover = hover;
+            }
+            Input::MouseDown(..) => {
+                if self.hover {
+                    self.dragging = true;
+
+                    self.events.push((input, *input_state));
+                    for child in self.children.iter_mut() {
+                        child.input_inner(input, input_state, offset);
+                    }
+                }
+            }
+            Input::MouseUp(..) => {
+                if self.hover || self.dragging {
+                    self.events.push((input, *input_state));
+                    for child in self.children.iter_mut() {
+                        child.input_inner(input, input_state, offset);
+                    }
+                }
+
+                self.dragging = false;
+            }
+            Input::Scroll(..) => {
+                if self.hover || self.dragging {
+                    self.events.push((input, *input_state));
+                    for child in self.children.iter_mut() {
+                        child.input_inner(input, input_state, offset);
+                    }
+                }
+            }
+            Input::KeyDown(..) | Input::KeyUp(..) | Input::Char(..) => {}
+        }
+    }
 }
 
 pub struct Cursor<'a> {
@@ -324,5 +396,50 @@ impl<C: ElemList> Elem for Row<C> {
         }
 
         node.set_size((x - self.spacing).max(0.0), height);
+    }
+}
+
+pub struct Button<C: Elem, F> {
+    child: C,
+    on_click: F,
+}
+
+impl<C: Elem> Button<C, fn()> {
+    pub fn new(child: C) -> Button<C, fn()> {
+        Button { child, on_click: || {} }
+    }
+}
+
+impl<C: Elem, F: FnMut()> Button<C, F> {
+    pub fn on_click<G: FnMut()>(self, on_click: G) -> Button<C, G> {
+        Button { child: self.child, on_click }
+    }
+}
+
+impl<C: Elem, F: FnMut()> Elem for Button<C, F> {
+    fn apply(mut self, node: &mut Node, bounds: Bounds) {
+        node.tag(id!());
+
+        for (input, input_state) in node.poll() {
+            match input {
+                Input::MouseUp(..) => {
+                    if node.hover() { (self.on_click)(); }
+                }
+                _ => {},
+            }
+        }
+
+        let color = if node.dragging() {
+            Color::rgba(0.141, 0.44, 0.77, 1.0)
+        } else if node.hover() {
+            Color::rgba(0.54, 0.63, 0.71, 1.0)
+        } else {
+            Color::rgba(0.38, 0.42, 0.48, 1.0)
+        };
+
+        BackgroundColor::new(color, Padding::new(5.0, self.child))
+            .apply(node.edit_children().add(), bounds);
+        let (width, height) = node.children()[0].size();
+        node.set_size(width, height);
     }
 }
