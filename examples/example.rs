@@ -24,27 +24,19 @@ fn main() {
 
     let font = Rc::new(Font::from_bytes(include_bytes!("../res/SourceSansPro-Regular.ttf")).unwrap());
 
-    let mut receiver = Receiver::new();
-    let sender = receiver.sender();
+    let size = context.window().get_inner_size().unwrap();
 
     let mut root = Node::new();
-    Row::new(
-        5.0,
-        children![
-            Button::new(
-                Padding::new(
-                    5.0,
-                    Text::new(font.clone(), 14.0, "jackdaws love my".to_string()),
-                ),
-            ).on_click(move || { sender.send(()) }),
-            Button::new(
-                Padding::new(
-                    5.0,
-                    Text::new(font.clone(), 14.0, "big sphinx of quartz".to_string()),
-                ),
-            ),
-        ],
-    ).install(&mut root);
+    Row::new(5.0)
+        .child(BackgroundColor::new(
+            Color::rgba(0.38, 0.42, 0.48, 1.0),
+            Padding::new(5.0, Text::new(font.clone(), 14.0, "jackdaws love my")),
+        ))
+        .child(BackgroundColor::new(
+            Color::rgba(0.38, 0.42, 0.48, 1.0),
+            Padding::new(5.0, Text::new(font.clone(), 14.0, "big sphinx of quartz")),
+        ))
+        .apply(&mut root, Bounds::new(size.width as f32, size.height as f32));
 
     let mut running = true;
     let mut now = std::time::Instant::now();
@@ -55,8 +47,6 @@ fn main() {
 
         frame.clear(Color::rgba(0.1, 0.15, 0.2, 1.0));
 
-        root.layout(size.width as f32, size.height as f32);
-        root.offset(0.0, 0.0);
         root.render(&mut frame);
 
         frame.finish();
@@ -85,12 +75,8 @@ fn main() {
             }
 
             if let Some(input) = backends::glutin::process_event(event, &mut input_state) {
-                root.handle(input, &input_state);
+                root.input(input, &input_state);
             }
         });
-
-        for _ in receiver.drain() {
-            println!("click");
-        }
     }
 }
