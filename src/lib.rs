@@ -399,6 +399,42 @@ impl<C: ElemList> Elem for Row<C> {
     }
 }
 
+pub struct Col<C: ElemList> {
+    spacing: f32,
+    children: C,
+}
+
+impl Col<EmptyList> {
+    pub fn new(spacing: f32) -> Col<EmptyList> {
+        Col { spacing, children: EmptyList }
+    }
+}
+
+impl<C: ElemList> Col<C> {
+    pub fn child<E: Elem>(self, child: E) -> Col<impl ElemList> {
+        Col { spacing: self.spacing, children: self.children.chain(child) }
+    }
+}
+
+impl<C: ElemList> Elem for Col<C> {
+    fn apply(self, node: &mut Node, bounds: Bounds) {
+        node.tag(id!());
+
+        self.children.apply_all(&mut node.edit_children(), Bounds::new(std::f32::INFINITY, bounds.height));
+
+        let mut y: f32 = 0.0;
+        let mut width: f32 = 0.0;
+        for child in node.children_mut() {
+            child.set_offset(y, 0.0);
+            let (child_width, child_height) = child.size();
+            y += child_width + self.spacing;
+            width = width.max(child_width);
+        }
+
+        node.set_size((y - self.spacing).max(0.0), width);
+    }
+}
+
 pub struct Button<C: Elem, F> {
     child: C,
     on_click: F,
