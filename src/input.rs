@@ -168,7 +168,7 @@ pub enum Key {
     RightMeta,
 }
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, PartialEq, Eq)]
 pub enum MouseButton {
     Left,
     Middle,

@@ -4,7 +4,7 @@ use crate::*;
 
 const FRAME: std::time::Duration = std::time::Duration::from_micros(1_000_000 / 60);
 
-pub fn run<E: Elem, F: Fn() -> E>(template: F) {
+pub fn run<E: Elem, F: FnMut() -> E>(mut template: F) {
     let mut events_loop = glutin::EventsLoop::new();
     let window_builder = glutin::WindowBuilder::new()
         .with_dimensions(glutin::dpi::LogicalSize::new(800.0, 600.0))

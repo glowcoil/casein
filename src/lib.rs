@@ -5,11 +5,14 @@ pub mod backends;
 
 use std::any::{Any, TypeId};
 use std::cell::Cell;
+use std::collections::HashMap;
+use std::marker::PhantomData;
 use std::rc::Rc;
 
 use gouache::{Color, Frame, Font, Glyph, Path, Vec2, Mat2x2};
-use input::{Input, InputState};
+use input::{Input, InputState, MouseButton, Key};
 
+#[macro_export]
 macro_rules! id {
     () => { { static ID: u8 = 0; &ID as *const u8 as usize } }
 }
@@ -89,7 +92,32 @@ pub struct Node {
 
     hover: bool,
     dragging: bool,
-    events: Vec<(Input, InputState)>,
+    handlers: Handlers,
+    state: Box<dyn Any>,
+}
+
+struct Handlers {
+    on_mouse_move: Option<Box<dyn Fn(&InputState)>>,
+    on_mouse_down: Option<Box<dyn Fn(MouseButton, &InputState)>>,
+    on_mouse_up: Option<Box<dyn Fn(MouseButton, &InputState)>>,
+    on_scroll: Option<Box<dyn Fn(f32, f32, &InputState)>>,
+    on_key_down: Option<Box<dyn Fn(Key, &InputState)>>,
+    on_key_up: Option<Box<dyn Fn(Key, &InputState)>>,
+    on_char: Option<Box<dyn Fn(char, &InputState)>>,
+}
+
+impl Default for Handlers {
+    fn default() -> Handlers {
+        Handlers {
+            on_mouse_move: None,
+            on_mouse_down: None,
+            on_mouse_up: None,
+            on_scroll: None,
+            on_key_down: None,
+            on_key_up: None,
+            on_char: None,
+        }
+    }
 }
 
 impl Node {
@@ -107,7 +135,8 @@ impl Node {
 
             hover: false,
             dragging: false,
-            events: Vec::new(),
+            handlers: Handlers::default(),
+            state: Box::new(()),
         }
     }
 
@@ -158,8 +187,40 @@ impl Node {
         Cursor { node: self, index: 0 }
     }
 
-    pub fn poll(&mut self) -> impl Iterator<Item=(Input, InputState)> {
-        std::mem::replace(&mut self.events, Vec::new()).into_iter()
+    pub fn state<T: 'static>(&mut self, default: impl Fn() -> T) -> &mut T {
+        if (*self.state).type_id() != TypeId::of::<T>() {
+            self.state = Box::new(default());
+        }
+
+        self.state.downcast_mut::<T>().unwrap()
+    }
+
+    pub fn on_mouse_move(&mut self, f: impl Fn(&InputState) + 'static) {
+        self.handlers.on_mouse_move = Some(Box::new(f));
+    }
+
+    pub fn on_mouse_down(&mut self, f: impl Fn(MouseButton, &InputState) + 'static) {
+        self.handlers.on_mouse_down = Some(Box::new(f));
+    }
+
+    pub fn on_mouse_up(&mut self, f: impl Fn(MouseButton, &InputState) + 'static) {
+        self.handlers.on_mouse_up = Some(Box::new(f));
+    }
+
+    pub fn on_scroll(&mut self, f: impl Fn(f32, f32, &InputState) + 'static) {
+        self.handlers.on_scroll = Some(Box::new(f));
+    }
+
+    pub fn on_key_down(&mut self, f: impl Fn(Key, &InputState) + 'static) {
+        self.handlers.on_key_down = Some(Box::new(f));
+    }
+
+    pub fn on_key_up(&mut self, f: impl Fn(Key, &InputState) + 'static) {
+        self.handlers.on_key_up = Some(Box::new(f));
+    }
+
+    pub fn on_char(&mut self, f: impl Fn(char, &InputState) + 'static) {
+        self.handlers.on_char = Some(Box::new(f));
     }
 
     pub fn hover(&self) -> bool {
@@ -209,7 +270,9 @@ impl Node {
                     input_state.mouse_y >= offset.y && input_state.mouse_y < offset.y + self.size.y;
 
                 if self.dragging || self.hover || hover {
-                    self.events.push((input, *input_state));
+                    if let Some(ref on_mouse_move) = self.handlers.on_mouse_move {
+                        on_mouse_move(input_state);
+                    }
                     for child in self.children.iter_mut() {
                         child.input_inner(input, input_state, offset);
                     }
@@ -217,19 +280,23 @@ impl Node {
 
                 self.hover = hover;
             }
-            Input::MouseDown(..) => {
+            Input::MouseDown(button) => {
                 if self.hover {
                     self.dragging = true;
 
-                    self.events.push((input, *input_state));
+                    if let Some(ref on_mouse_down) = self.handlers.on_mouse_down {
+                        on_mouse_down(button, input_state);
+                    }
                     for child in self.children.iter_mut() {
                         child.input_inner(input, input_state, offset);
                     }
                 }
             }
-            Input::MouseUp(..) => {
+            Input::MouseUp(button) => {
                 if self.hover || self.dragging {
-                    self.events.push((input, *input_state));
+                    if let Some(ref on_mouse_up) = self.handlers.on_mouse_up {
+                        on_mouse_up(button, input_state);
+                    }
                     for child in self.children.iter_mut() {
                         child.input_inner(input, input_state, offset);
                     }
@@ -237,9 +304,11 @@ impl Node {
 
                 self.dragging = false;
             }
-            Input::Scroll(..) => {
+            Input::Scroll(dx, dy) => {
                 if self.hover || self.dragging {
-                    self.events.push((input, *input_state));
+                    if let Some(ref on_scroll) = self.handlers.on_scroll {
+                        on_scroll(dx, dy, input_state);
+                    }
                     for child in self.children.iter_mut() {
                         child.input_inner(input, input_state, offset);
                     }
@@ -247,6 +316,37 @@ impl Node {
             }
             Input::KeyDown(..) | Input::KeyUp(..) | Input::Char(..) => {}
         }
+    }
+}
+
+pub struct Receiver<T> {
+    queue: Rc<Cell<Vec<T>>>,
+}
+
+impl<T: 'static> Receiver<T> {
+    pub fn new() -> Receiver<T> {
+        Receiver { queue: Rc::new(Cell::new(Vec::new())) }
+    }
+
+    pub fn sender(&self) -> Sender<T> {
+        Sender { queue: self.queue.clone() }
+    }
+
+    pub fn poll(&self) -> impl Iterator<Item=T> {
+        self.queue.replace(Vec::new()).into_iter()
+    }
+}
+
+#[derive(Clone)]
+pub struct Sender<T> {
+    queue: Rc<Cell<Vec<T>>>,
+}
+
+impl<T: 'static> Sender<T> {
+    pub fn send(&self, value: T) {
+        let mut queue = self.queue.replace(Vec::new());
+        queue.push(value);
+        self.queue.set(queue);
     }
 }
 
@@ -455,24 +555,22 @@ impl<C: Elem> Button<C, fn()> {
     }
 }
 
-impl<C: Elem, F: FnMut()> Button<C, F> {
-    pub fn on_click<G: FnMut()>(self, on_click: G) -> Button<C, G> {
+impl<C: Elem, F: Fn()> Button<C, F> {
+    pub fn on_click<G: Fn()>(self, on_click: G) -> Button<C, G> {
         Button { child: self.child, on_click }
     }
 }
 
-impl<C: Elem, F: FnMut()> Elem for Button<C, F> {
+impl<C: Elem, F: Fn() + 'static> Elem for Button<C, F> {
     fn apply(mut self, node: &mut Node, bounds: Bounds) {
         node.tag(id!());
 
-        for (input, input_state) in node.poll() {
-            match input {
-                Input::MouseUp(..) => {
-                    if node.hover() { (self.on_click)(); }
-                }
-                _ => {},
+        let on_click = self.on_click;
+        node.on_mouse_up(move |button, input_state| {
+            if button == MouseButton::Left {
+                on_click();
             }
-        }
+        });
 
         let color = if node.dragging() {
             Color::rgba(0.141, 0.44, 0.77, 1.0)
