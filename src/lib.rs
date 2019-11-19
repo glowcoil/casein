@@ -26,9 +26,7 @@ pub trait ElemList {
     }
 }
 
-pub struct EmptyList;
-
-impl ElemList for EmptyList {
+impl ElemList for () {
     fn apply_all(self, cursor: &mut Cursor, bounds: Bounds) {}
 }
 
@@ -46,6 +44,29 @@ impl<E: Elem> ElemList for E {
         self.apply(cursor.add(), bounds);
     }
 }
+
+macro_rules! tuple_elem_list {
+    ( $(($i:tt) $E:ident),+ ) => {
+        impl<$($E: Elem),+> ElemList for ($($E,)+) {
+            fn apply_all(self, cursor: &mut Cursor, bounds: Bounds) {
+                $(self.$i.apply(cursor.add(), bounds);)+
+            }
+        }
+    }
+}
+
+tuple_elem_list!((0) A);
+tuple_elem_list!((0) A, (1) B);
+tuple_elem_list!((0) A, (1) B, (2) C);
+tuple_elem_list!((0) A, (1) B, (2) C, (3) D);
+tuple_elem_list!((0) A, (1) B, (2) C, (3) D, (4) E);
+tuple_elem_list!((0) A, (1) B, (2) C, (3) D, (4) E, (5) F);
+tuple_elem_list!((0) A, (1) B, (2) C, (3) D, (4) E, (5) F, (6) G);
+tuple_elem_list!((0) A, (1) B, (2) C, (3) D, (4) E, (5) F, (6) G, (7) H);
+tuple_elem_list!((0) A, (1) B, (2) C, (3) D, (4) E, (5) F, (6) G, (7) H, (8) I);
+tuple_elem_list!((0) A, (1) B, (2) C, (3) D, (4) E, (5) F, (6) G, (7) H, (8) I, (9) J);
+tuple_elem_list!((0) A, (1) B, (2) C, (3) D, (4) E, (5) F, (6) G, (7) H, (8) I, (9) J, (10) K);
+tuple_elem_list!((0) A, (1) B, (2) C, (3) D, (4) E, (5) F, (6) G, (7) H, (8) I, (9) J, (10) K, (11) L);
 
 #[derive(Copy, Clone)]
 pub struct Bounds {
@@ -368,15 +389,9 @@ pub struct Row<C: ElemList> {
     children: C,
 }
 
-impl Row<EmptyList> {
-    pub fn new(spacing: f32) -> Row<EmptyList> {
-        Row { spacing, children: EmptyList }
-    }
-}
-
 impl<C: ElemList> Row<C> {
-    pub fn child<E: Elem>(self, child: E) -> Row<impl ElemList> {
-        Row { spacing: self.spacing, children: self.children.chain(child) }
+    pub fn new(spacing: f32, children: C) -> Row<C> {
+        Row { spacing, children }
     }
 }
 
@@ -404,15 +419,9 @@ pub struct Col<C: ElemList> {
     children: C,
 }
 
-impl Col<EmptyList> {
-    pub fn new(spacing: f32) -> Col<EmptyList> {
-        Col { spacing, children: EmptyList }
-    }
-}
-
 impl<C: ElemList> Col<C> {
-    pub fn child<E: Elem>(self, child: E) -> Col<impl ElemList> {
-        Col { spacing: self.spacing, children: self.children.chain(child) }
+    pub fn new(spacing: f32, children: C) -> Col<C> {
+        Col { spacing, children }
     }
 }
 
