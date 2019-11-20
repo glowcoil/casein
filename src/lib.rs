@@ -434,13 +434,13 @@ impl<C: ElemList> Elem for Col<C> {
         let mut y: f32 = 0.0;
         let mut width: f32 = 0.0;
         for child in node.children_mut() {
-            child.set_offset(y, 0.0);
+            child.set_offset(0.0, y);
             let (child_width, child_height) = child.size();
-            y += child_width + self.spacing;
+            y += child_height + self.spacing;
             width = width.max(child_width);
         }
 
-        node.set_size((y - self.spacing).max(0.0), width);
+        node.set_size(width, (y - self.spacing).max(0.0));
     }
 }
 
