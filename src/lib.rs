@@ -21,7 +21,7 @@ pub trait Elem {
 pub trait ElemList {
     fn apply_all(self, cursor: &mut Cursor, bounds: Bounds);
 
-    fn chain<N: Elem>(self, next: N) -> Chain<Self, N> where Self: Sized {
+    fn chain<N: ElemList>(self, next: N) -> Chain<Self, N> where Self: Sized {
         Chain(self, next)
     }
 }
