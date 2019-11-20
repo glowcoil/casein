@@ -586,3 +586,40 @@ impl<C: Elem, F: Fn() + 'static> Elem for Button<C, F> {
         node.set_size(width, height);
     }
 }
+
+pub struct Scrollable<C: Elem> {
+    child: C,
+}
+
+impl<C: Elem> Scrollable<C> {
+    pub fn new(child: C) -> Scrollable<C> {
+        Scrollable { child }
+    }
+}
+
+impl<C: Elem> Elem for Scrollable<C> {
+    fn apply(mut self, node: &mut Node, bounds: Bounds) {
+        node.tag(id!());
+
+        self.child.apply(node.edit_children().add(), Bounds::new(bounds.width, std::f32::INFINITY));
+        let (width, height) = node.children()[0].size();
+
+        struct ScrollState {
+            offset: f32,
+            rx: Receiver<f32>,
+        }
+        let mut state = node.state(|| ScrollState { offset: 0.0, rx: Receiver::new() });
+        for dy in state.rx.poll() {
+            state.offset = (state.offset - dy).min(height - bounds.height).max(0.0);
+        }
+
+        let tx = state.rx.sender();
+        let offset = state.offset;
+        node.on_scroll(move |dx, dy, input_state| {
+            tx.send(dy);
+        });
+
+        node.children_mut()[0].set_offset(0.0, -offset);
+        node.set_size(width, height);
+    }
+}
